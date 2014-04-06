@@ -1333,6 +1333,9 @@ JSONEditor.AbstractEditor = Class.extend({
     if(!this.jsoneditor) return;
     this.jsoneditor.unregisterEditor(this);
   },
+  getNumColumns: function() {
+    return 12;
+  },
   init: function(options) {
     var self = this;
     this.container = options.container;
@@ -1763,7 +1766,10 @@ JSONEditor.defaults.editors.null = JSONEditor.AbstractEditor.extend({
   },
   setValue: function() {
     this.jsoneditor.notifyWatchers(this.path);
-  }
+  },
+  getNumColumns: function() {
+    return 2;
+  },
 });
 
 JSONEditor.defaults.editors.string = JSONEditor.AbstractEditor.extend({
@@ -1829,6 +1835,10 @@ JSONEditor.defaults.editors.string = JSONEditor.AbstractEditor.extend({
     this.input.style.display = '';
     if(this.description) this.description.style.display = '';
     this.theme.enableLabel(this.label);
+  },
+  getNumColumns: function() {
+    if(this.input_type === 'textarea') return 6;
+    return 4;
   },
   build: function() {
     var self = this;
@@ -1976,7 +1986,7 @@ JSONEditor.defaults.editors.string = JSONEditor.AbstractEditor.extend({
           'yaml'
         ].indexOf(this.format) >= 0
       ) {
-        this.input_type = this.format;
+        this.input_type = 'textarea';
         this.source_code = true;
         
         this.input = this.theme.getTextareaInput();
@@ -2316,6 +2326,9 @@ JSONEditor.defaults.editors.number = JSONEditor.defaults.editors.string.extend({
   sanitize: function(value) {
     return (value+"").replace(/[^0-9\.\-]/g,'');
   },
+  getNumColumns: function() {
+    return 2;
+  },
   getValue: function() {
     return this.value*1;
   }
@@ -2325,6 +2338,9 @@ JSONEditor.defaults.editors.integer = JSONEditor.defaults.editors.number.extend(
   sanitize: function(value) {
     value = value + "";
     return value.replace(/[^0-9\-]/g,'');
+  },
+  getNumColumns: function() {
+    return 2;
   }
 });
 
@@ -2450,12 +2466,21 @@ JSONEditor.defaults.editors.object = JSONEditor.AbstractEditor.extend({
       this.error_holder = document.createElement('div');
       this.container.appendChild(this.error_holder);
       this.editor_holder = this.getTheme().getIndentedPanel();
+      //is.editor_holder.className += " container";
+      this.editor_holder.style.paddingBottom = '0';
       this.container.appendChild(this.editor_holder);
 
+      var col_count = 0;
+      var current_row = document.createElement('div');
+      current_row.className = 'row';
+      this.editor_holder.appendChild(current_row);
+
+      var last_key;
+      var editor_columns = {};
       $each(this.schema.properties, function(key,schema) {
         var editor = self.jsoneditor.getEditorClass(schema, self.jsoneditor);
         var holder = self.getTheme().getChildEditorHolder();
-        self.editor_holder.appendChild(holder);
+        current_row.appendChild(holder);
 
         // If the property is required
         var required;
@@ -2471,6 +2496,27 @@ JSONEditor.defaults.editors.object = JSONEditor.AbstractEditor.extend({
           parent: self,
           required: required
         });
+        
+        col_count += self.editors[key].getNumColumns();
+        if(col_count > 12) {
+          if(last_key) {
+            editor_columns[last_key] = 12-(col_count-self.editors[key].getNumColumns());
+          }
+          col_count = self.editors[key].getNumColumns();
+          current_row = document.createElement('div');
+          current_row.className = 'row';
+          self.editor_holder.appendChild(current_row);
+          current_row.appendChild(holder);
+        }
+        last_key = key;
+        
+        
+        editor_columns[key] = self.editors[key].getNumColumns();
+      });
+      if(last_key && col_count < 12) editor_columns[last_key] += (12-col_count);
+      
+      $each(editor_columns,function(key,cols) {
+        self.editors[key].container.className += " columns medium-"+cols;
       });
 
       // Control buttons
@@ -3905,6 +3951,9 @@ JSONEditor.defaults.editors.multiple = JSONEditor.AbstractEditor.extend({
     }
     this._super();
   },
+  getNumColumns: function() {
+    return 6;
+  },
   enable: function() {
     if(this.editors) {
       for(var i=0; i<this.editors.length; i++) {
@@ -4145,6 +4194,9 @@ JSONEditor.defaults.editors.enum = JSONEditor.AbstractEditor.extend({
     this.display_area.style.display = 'none';
     this.theme.disableHeader(this.title);
   },
+  getNumColumns: function() {
+    return 4;
+  },
   build: function() {
     var container = this.getContainer();
     this.title = this.getTheme().getHeader(this.getTitle());
@@ -4292,6 +4344,9 @@ JSONEditor.defaults.editors.select = JSONEditor.AbstractEditor.extend({
     this.input.value = this.enum_options[this.enum_values.indexOf(sanitized)];
     this.value = sanitized;
     this.jsoneditor.notifyWatchers(this.path);
+  },
+  getNumColumns: function() {
+    return 4;
   },
   typecast: function(value) {
     if(this.schema.type === "boolean") {
